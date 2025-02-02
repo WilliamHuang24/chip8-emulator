@@ -2,8 +2,14 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <iomanip>
+
+#include <cmath>
+#include <bitset>
 
 #include "chip8.h"
+
+void printHex(unsigned int target, unsigned int digits);
 
 unsigned char chip8_fontset[80] = { 
     0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
@@ -25,6 +31,20 @@ unsigned char chip8_fontset[80] = {
 };
 
 Chip8::Chip8() {
+    // zero memory
+    for (int i = 0; i < 4096; i++) {
+        memory[i] = 0;
+    }
+
+    for (int i = 0; i < 16; i++) {
+        registers[i] = 0;
+        input[i] = 0;
+    }
+
+    for (int i = 0; i < 32; i++) {
+        display[i] = 0;
+    }
+
     // load font set into memory
     for (int i = 0; i < 80; ++i) {
         memory[i] = chip8_fontset[i];
@@ -35,6 +55,9 @@ Chip8::Chip8() {
     index = 0;
     sp = 0;
 
+    sound = 0;
+    delay = 0;
+
     display[1] = 0x200;
 }
 
@@ -42,14 +65,12 @@ int Chip8::load(std::string filename) {
     std::ifstream program(filename, std::ios::binary);
 
     if (program.is_open()) {
-        unsigned int counter = 512;
-        
-        while (program.good()) {
-            program >> memory[counter++];
+        char * buffer = new char[2048];
+        program.read(buffer, 2048);
 
-            if (counter >= 4096) {
-                return -1;
-            }
+        for (int i = 0; i < 2048; i++) {
+            memory[i + 0x200] = buffer[i];
+            // std::cout << std::hex << std::setw(2) << std::setfill('0') << (((unsigned int) memory[i + 0x200]) & 0xff) << ' ';
         }
         
         return 0;
@@ -58,12 +79,12 @@ int Chip8::load(std::string filename) {
     return -1;
 }
 
-void Chip8::cycle() {
+int Chip8::cycle() {
     // fetch instruction
     short opcode = memory[pc] << 8 | memory[pc + 1];
 
     // process opcode
-    switch (opcode >> 12) {
+    switch ((opcode >> 12) & 0xf) {
         case 0x0: {
             if (opcode == 0x00e0) {
                 // CLS
@@ -180,7 +201,7 @@ void Chip8::cycle() {
         }
 
         case 0xA: {
-            unsigned short immediate = opcode & 4095;
+            unsigned short immediate = opcode & 0xFFF;
             index = immediate;
 
             break;
@@ -189,7 +210,7 @@ void Chip8::cycle() {
         case 0xB: {
             unsigned short immediate = opcode & 4095;
             pc = registers[0] + immediate;
-            
+
             break;
         }
 
@@ -212,35 +233,78 @@ void Chip8::cycle() {
             unsigned short x = registers[vx];
             unsigned short y = registers[vy];
 
-            for (int i = 0; i < n; n++) {
+            for (int i = 0; i < n; i++) {
                 // read from address at register I
-                unsigned char read = memory[index + i];
+                unsigned long long read = memory[index + i];
 
-                // draw at x, y + i
+                // std::bitset<64>bits(read << (64 - x));
+                // std::cout << bits << '\n';
 
-                // TODO: handle overflow x
-                display[(y + i) % 32] ^= read << x;
+                if (x > 56) {
+                    // left part of sprite
+                    display[(y + i) % 32] ^= read >> (x - 56);
+
+                    //right part of sprite
+                    display[(y + i) % 32] ^= read << (64 - (x - 56));
+
+                } else {
+                    display[(y + i) % 32] ^= read << (56 - x);
+                }
             }
+
+            // std::cout << std::endl;
+
+            // for (int i = 0; i < 32; i++) {
+            //     std::bitset<64>bits(display[i]);
+            //     std::cout << bits << '\n';
+            // }
 
             break;
         }
-
-
-        // modify timers
-        if (delay > 0) {
-            delay--;
-        }
-
-        if (sound > 0) {
-            if (sound == 1) {
-                std::cout << "sound";
-            }
-
-            sound--;
-        }
     }
-    
 
+    // modify timers
+    if (delay > 0) {
+        delay--;
+    }
+
+    if (sound > 0) {
+        if (sound == 1) {
+            std::cout << "sound";
+        }
+
+        sound--;
+    }
+
+    // print CPU state
+    std::cout << "pc: " << pc << " opcode: ";
+    std::cout << std::hex << opcode;
+    std::cout << " registers: ";
+
+    for (int i = 0; i < 2; i++) {
+        std::cout << i << " : ";
+        printHex(registers[i], 4);
+    }
+
+    std::cout << " index " << index << std::endl;
+
+    // increase program counter on non-jump instructions
+    switch (opcode >> 12 & 0xf) {
+        case 0x1:
+        case 0x2:
+        case 0xb:
+            break;
+
+        default:
+            pc += 2;
+    }
+
+    return 0;
+}
+
+void printHex(unsigned int target, unsigned int digits) {
+    unsigned int mask = std::pow(2, digits * 4) - 1; 
+    std::cout << std::hex << std::setw(digits) << std::setfill('0') << (target & mask) <<  " ";
 }
 
 

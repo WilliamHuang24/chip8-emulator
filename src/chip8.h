@@ -2,9 +2,10 @@
 #define CHIP8
 
 #include <string>
+#include <stdint.h>
 
 class Chip8 {
-    unsigned char memory[4096];
+
 
     unsigned char registers[16];
     unsigned short pc;
@@ -18,10 +19,12 @@ class Chip8 {
     unsigned char key[16];
 
     public:
+        unsigned char memory[4096];
         unsigned long long display[32];
+        uint8_t input[16];
 
         Chip8();
-        void cycle();
+        int cycle();
         int load(std::string filename);
 };
 
