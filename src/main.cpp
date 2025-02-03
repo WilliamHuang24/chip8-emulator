@@ -29,7 +29,7 @@ int main(int argc, char** argv) {
 		chip8.cycle();
 		window.updateDisplay(chip8.display, 32);
 
-		SDL_Delay(250);
+		SDL_Delay(4);
 	}
 
 	return 0;

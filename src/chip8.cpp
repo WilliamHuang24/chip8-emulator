@@ -82,7 +82,6 @@ int Chip8::load(std::string filename) {
 int Chip8::cycle() {
     // fetch instruction
     short opcode = memory[pc] << 8 | memory[pc + 1];
-    bool advance = true;
 
     // process opcode
     switch ((opcode >> 12) & 0xf) {
@@ -94,7 +93,7 @@ int Chip8::cycle() {
                 }
             } else if (opcode == 0x00ee) {
                 // RET
-                pc = sp--;
+                pc = stack[--sp];
             } 
 
             break;
@@ -318,7 +317,7 @@ int Chip8::cycle() {
                 break;
             }
             
-            if (key[registers[vx]] == val) {
+            if (input[registers[vx]] == val) {
                 pc += 2;
             }
 
@@ -335,12 +334,17 @@ int Chip8::cycle() {
                     break;
 
                 case 0x0a: {
-                    advance = false;
+                    bool found = false;
 
                     for (int i = 0; i < 16; i++) {
-                        if (key[i] > 0) {
-                            advance = true;
+                        if (input[i] > 0) {
+                            registers[vx] = i;
+                            found = true;
                         }
+                    }
+
+                    if (!found) {
+                        pc -= 2;
                     }
 
                     break;
@@ -412,31 +416,22 @@ int Chip8::cycle() {
     }
 
     // print CPU state
-    std::cout << "pc: " << pc << " opcode: ";
-    std::cout << std::hex << opcode;
-    std::cout << " registers: ";
+    // std::cout << "pc: " << pc << " opcode: ";
+    // std::cout << std::hex << opcode;
+    // std::cout << " registers: ";
 
-    for (int i = 0; i < 2; i++) {
-        std::cout << i << " : ";
-        printHex(registers[i], 4);
-    }
+    // for (int i = 0; i < 2; i++) {
+    //     std::cout << i << " : ";
+    //     printHex(registers[i], 4);
+    // }
 
-    std::cout << " index " << index << std::endl;
+    // std::cout << " index " << index << std::endl;
 
     // increase program counter on non-jump instructions
     switch (opcode >> 12 & 0xf) {
         case 0x1:
         case 0x2:
         case 0xb:
-            break;
-
-        case 0xf:
-            if (opcode & 0xf0ff == 0xf00a) {
-                if (advance) {
-                    pc += 2;
-                }
-            }
-            
             break;
 
         default:

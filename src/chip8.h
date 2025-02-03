@@ -16,8 +16,6 @@ class Chip8 {
     unsigned short stack[16];
     unsigned short sp;
 
-    unsigned char key[16];
-
     public:
         unsigned char memory[4096];
         unsigned long long display[32];

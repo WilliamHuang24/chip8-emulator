@@ -1,5 +1,6 @@
 #include <SDL2/SDL.h>
 #include "window.h"
+#include <iostream>
 
 Window::Window(int width, int height, int pixelSize) {
     size = pixelSize;
@@ -46,9 +47,10 @@ bool Window::processInput(uint8_t* keys) {
         if (event.type == SDL_QUIT) {
             exit = true;
             break;
-        }
 
-		else if (event.type == SDL_KEYDOWN) {
+        } else if (event.type == SDL_KEYDOWN) {
+            std::cout << "key pressed";
+
 			switch (event.key.keysym.sym) {
                 case SDLK_ESCAPE:
                     exit = true;
@@ -119,9 +121,8 @@ bool Window::processInput(uint8_t* keys) {
 					break;
 
 			}
-		}
 
-        else if (event.type == SDL_KEYUP) {
+		} else if (event.type == SDL_KEYUP) {
 			switch (event.key.keysym.sym) {
                 case SDLK_ESCAPE:
                     exit = true;
@@ -190,7 +191,6 @@ bool Window::processInput(uint8_t* keys) {
 				case SDLK_v:
                     keys[15] = 0;
 					break;
-
 			}
 		}
 	}
