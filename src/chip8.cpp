@@ -183,7 +183,7 @@ int Chip8::cycle() {
                     registers[vx] ^= registers[vy];
                     break;
 
-                case 0x4:
+                case 0x4: {
                     unsigned char sum = registers[vx] + registers[vy];
 
                     // check overflow
@@ -195,6 +195,7 @@ int Chip8::cycle() {
 
                     registers[vx] = sum;
                     break;
+                }
 
                 case 0x5:
                     if (registers[vx] > registers[vy]) {
