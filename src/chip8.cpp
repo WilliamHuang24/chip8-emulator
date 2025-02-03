@@ -82,6 +82,7 @@ int Chip8::load(std::string filename) {
 int Chip8::cycle() {
     // fetch instruction
     short opcode = memory[pc] << 8 | memory[pc + 1];
+    bool advance = true;
 
     // process opcode
     switch ((opcode >> 12) & 0xf) {
@@ -100,19 +101,19 @@ int Chip8::cycle() {
         }
 
         case 0x1: {
-            pc = opcode & (4095);
+            pc = opcode & 0x0FFF;
             break;
         }
 
         case 0x2: {
             stack[sp++] = pc;
-            pc = opcode & 4095;
+            pc = opcode & 0x0FFF;
             break;
         }
 
         case 0x3: {
-            unsigned short vx = (opcode >> 8) & 15;
-            unsigned short immediate = opcode & (255); 
+            unsigned short vx = (opcode >> 8) & 0xF;
+            unsigned short immediate = opcode & 0x00FF; 
 
             if (registers[vx] == immediate) {
                 pc += 2;
@@ -122,8 +123,8 @@ int Chip8::cycle() {
         }
 
         case 0x4: {
-            unsigned short vx = (opcode >> 8) & 15;
-            unsigned short immediate = opcode & (255); 
+            unsigned short vx = (opcode >> 8) & 0xF;
+            unsigned short immediate = opcode & 0x00FF; 
 
             if (registers[vx] != immediate) {
                 pc += 2;
@@ -145,16 +146,15 @@ int Chip8::cycle() {
 
         case 0x6: {
             unsigned short vx = (opcode >> 8) & 15;
-            unsigned short immediate = opcode & (255);
+            unsigned short immediate = opcode & 0x00FF;
 
             registers[vx] = immediate;
             break;
         }
 
-        // TODO check if immediate can be signed
         case 0x7: {
             unsigned short vx = (opcode >> 8) & 15;
-            unsigned short immediate = opcode & (255);
+            unsigned short immediate = opcode & 0x00FF;
 
             registers[vx] += immediate;
             break;
@@ -183,7 +183,48 @@ int Chip8::cycle() {
                     registers[vx] ^= registers[vy];
                     break;
 
-                // TODO: finish
+                case 0x4:
+                    unsigned char sum = registers[vx] + registers[vy];
+
+                    // check overflow
+                    if (registers[vx] > sum || registers[vy] > sum) {
+                        registers[0xf] = 1;
+                    } else {
+                        registers[0xf] = 0;
+                    }
+
+                    registers[vx] = sum;
+                    break;
+
+                case 0x5:
+                    if (registers[vx] > registers[vy]) {
+                        registers[0xf] = 1;
+                    } else {
+                        registers[0xf] = 0;
+                    }
+
+                    registers[vx] -= registers[vy];
+                    break;
+
+                case 0x6:
+                    registers[0xf] = registers[vx] & 1;
+                    registers[vx] >>= 1;
+                    break;
+
+                case 0x7:
+                    if (registers[vy] > registers[vx]) {
+                        registers[0xf] = 1;
+                    } else {
+                        registers[0xf] = 0;
+                    }
+
+                    registers[vx] = registers[vy] - registers[vx];
+                    break;
+
+                case 0xE:
+                    registers[0xf] = (unsigned char) (registers[vx] & 0x80 > 0);
+                    registers[vx] <<= 1;
+                    break;
             }
 
             break;
@@ -261,6 +302,99 @@ int Chip8::cycle() {
 
             break;
         }
+
+        case 0xE: {
+            unsigned short operation = opcode & 0x00FF;
+            unsigned short vx = (opcode >> 8) & 15;
+
+            uint8_t val;
+
+            if (operation == 0x9e) {
+                val = 1;
+            } else if (operation == 0xa1) {
+                val = 0;
+            } else {
+                break;
+            }
+            
+            if (key[registers[vx]] == val) {
+                pc += 2;
+            }
+
+            break;
+        }
+
+        case 0xF: {
+            unsigned short operation = opcode & 0x00FF;
+            unsigned short vx = (opcode >> 8) & 15;
+
+            switch (operation) {
+                case 0x07:
+                    registers[vx] = delay;
+                    break;
+
+                case 0x0a: {
+                    advance = false;
+
+                    for (int i = 0; i < 16; i++) {
+                        if (key[i] > 0) {
+                            advance = true;
+                        }
+                    }
+
+                    break;
+                }
+
+                case 0x15: 
+                    delay = registers[vx];
+                    break;
+
+                case 0x18:
+                    sound = registers[vx];
+                    break;
+
+                case 0x1e:
+                    index += registers[vx];
+                    break;
+
+                case 0x29:
+                    index = 5 * registers[vx];
+                    break;
+
+                case 0x33: {
+                    // binary coded decimal
+                    unsigned char hundreds = registers[vx] / 100;
+                    unsigned char tens = (registers[vx] % 100) / 10;
+                    unsigned char ones = (registers[vx] % 10);
+
+                    memory[index] = hundreds;
+                    memory[index + 1] = tens;
+                    memory[index + 2] = ones;
+
+                    break;
+                }
+
+                case 0x55: {
+                    // store registers 0 to x in memory at I
+                    for (int i = 0; i <= vx; i++) {
+                        memory[index + i] = registers[i];
+                    }
+
+                    break;
+                }
+
+                case 0x65: {
+                    // read registers 0 to x in memory from I
+                    for (int i = 0; i <= vx; i++) {
+                        registers[i] = memory[index + i];
+                    }
+
+                    break;
+                }
+            }
+
+            break;
+        }
     }
 
     // modify timers
@@ -293,6 +427,15 @@ int Chip8::cycle() {
         case 0x1:
         case 0x2:
         case 0xb:
+            break;
+
+        case 0xf:
+            if (opcode & 0xf0ff == 0xf00a) {
+                if (advance) {
+                    pc += 2;
+                }
+            }
+            
             break;
 
         default:
